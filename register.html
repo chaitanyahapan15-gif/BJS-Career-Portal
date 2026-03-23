@@ -46,13 +46,13 @@
                         <div class="row mb-4">
                             <p class="fw-bold mb-3">Join as a:</p>
                             <div class="col-6 mb-2"> 
-                                <div class="role-box text-center active" onclick="selectRole(this, 'Student')">
+                                <div class="role-box text-center active" id="studentBox" onclick="selectRole(this, 'Student')">
                                     <h5 class="mb-0">🎓 Student</h5>
                                     <small class="text-muted d-none d-md-block">Apply for jobs</small>
                                 </div>
                             </div>
                             <div class="col-6 mb-2">
-                                <div class="role-box text-center" onclick="selectRole(this, 'Company')">
+                                <div class="role-box text-center" id="companyBox" onclick="selectRole(this, 'Company')">
                                     <h5 class="mb-0">🏢 Company</h5>
                                     <small class="text-muted d-none d-md-block">Hire best talent</small>
                                 </div>
@@ -111,6 +111,7 @@
     const firebaseConfig = {
         apiKey: "AIzaSyCYt-GaHe9FN3Hk5ULWMNIVeRcOMkcKK-8",
         authDomain: "hapan-d4d75.firebaseapp.com",
+        databaseURL: "https://hapan-d4d75-default-rtdb.firebaseio.com",
         projectId: "hapan-d4d75",
         storageBucket: "hapan-d4d75.firebasestorage.app",
         messagingSenderId: "558946058796",
@@ -127,13 +128,15 @@
 
     let currentRole = "Student";
 
-    function selectRole(element, role) {
+    // Role selection handler
+    window.selectRole = function(element, role) {
         document.querySelectorAll('.role-box').forEach(box => box.classList.remove('active'));
         element.classList.add('active');
         currentRole = role;
     }
 
-    document.getElementById('registerForm').addEventListener('submit', (e) => {
+    // Form submission handler
+    document.getElementById('registerForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const btn = document.getElementById('regBtn');
         const name = document.getElementById('fullName').value;
@@ -144,9 +147,10 @@
         btn.innerText = "Processing...";
         btn.disabled = true;
 
+        // Step 1: Create user in Firebase Auth
         auth.createUserWithEmailAndPassword(email, password)
         .then((userCredential) => {
-            // Save data to FIRESTORE
+            // Step 2: Store user profile in Firestore
             return db.collection("users").doc(userCredential.user.uid).set({
                 fullName: name,
                 email: email,
@@ -163,8 +167,8 @@
         .catch((error) => {
             btn.innerText = "Create Account";
             btn.disabled = false;
-            console.error("Firestore Error: ", error);
-            alert("Error: " + error.message);
+            console.error("Registration Error:", error);
+            alert(error.message);
         });
     });
 </script>

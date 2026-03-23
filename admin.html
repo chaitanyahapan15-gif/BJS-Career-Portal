@@ -1,205 +1,113 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BJS Career Portal Admin</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <style>
-        :root {
-            --glass-bg: rgba(255, 255, 255, 0.9);
-            --gradient-sidebar: linear-gradient(180deg, #4e73df 0%, #224abe 100%);
-            --accent-color: #4e73df;
-        }
+<script type="module">
+  // Firebase SDKs Import करणे
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { 
+      getFirestore, collection, addDoc, getDocs, onSnapshot, 
+      query, where, orderBy, deleteDoc, doc, updateDoc, serverTimestamp 
+  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  import { getAuth, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
-        body { background: #f0f2f5; font-family: 'Inter', sans-serif; overflow-x: hidden; }
+  // तुमचे Configuration (हे बरोबर आहे)
+  const firebaseConfig = {
+    apiKey: "AIzaSyCYt-GaHe9FN3Hk5ULWMNIVeRcOMkcKK-8",
+    authDomain: "hapan-d4d75.firebaseapp.com",
+    databaseURL: "https://hapan-d4d75-default-rtdb.firebaseio.com",
+    projectId: "hapan-d4d75",
+    storageBucket: "hapan-d4d75.firebasestorage.app",
+    messagingSenderId: "558946058796",
+    appId: "1:558946058796:web:2592756709069c5e764789",
+    measurementId: "G-9JRHTYMVPW"
+  };
 
-        /* Sidebar Responsive Styling */
-        .sidebar {
-            width: 260px; height: 100vh; background: var(--gradient-sidebar);
-            position: fixed; left: 0; top: 0; box-shadow: 4px 0 10px rgba(0,0,0,0.1);
-            color: white; z-index: 1050; transition: transform 0.3s ease;
-        }
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const auth = getAuth(app);
 
-        .sidebar-brand { padding: 2rem 1.5rem; font-size: 1.5rem; font-weight: 800; text-transform: uppercase; }
+  // --- Functions ---
 
-        .nav-link {
-            color: rgba(255,255,255,0.8); padding: 12px 25px; margin: 5px 15px;
-            border-radius: 10px; transition: all 0.3s ease; cursor: pointer;
-            display: block; text-decoration: none;
-        }
+  // 1. Applications Load करणे
+  const qApps = query(collection(db, "applications"), orderBy("appliedAt", "desc"));
+  onSnapshot(qApps, (snapshot) => {
+      const recentTable = document.getElementById('recentAppsTable');
+      document.getElementById('countApps').innerText = snapshot.size;
+      let rows = "";
+      snapshot.forEach((docSnap) => {
+          const appData = docSnap.data();
+          const statusClass = appData.status === 'Approved' ? 'badge-approved' : 'badge-pending';
+          rows += `<tr>
+              <td class="ps-4 fw-bold">${appData.studentName}</td>
+              <td>${appData.jobTitle}</td>
+              <td>${appData.companyName}</td>
+              <td><span class="badge ${statusClass} rounded-pill px-3">${appData.status || 'Pending'}</span></td>
+              <td class="text-end pe-4">
+                  <button onclick="approveApplication('${docSnap.id}')" class="btn btn-sm btn-light text-success me-1"><i class="bi bi-check"></i></button>
+                  <button onclick="deleteApplication('${docSnap.id}')" class="btn btn-sm btn-light text-danger"><i class="bi bi-trash"></i></button>
+              </td>
+          </tr>`;
+      });
+      recentTable.innerHTML = snapshot.empty ? "<tr><td colspan='5' class='text-center p-4'>No Data</td></tr>" : rows;
+  });
 
-        .nav-link:hover, .nav-link.active { background: rgba(255,255,255,0.2); color: white; transform: translateX(5px); }
+  // 2. Approve & Delete Functions (Window object ला जोडले कारण ते module मध्ये आहेत)
+  window.approveApplication = async (id) => { 
+      if(confirm("Approve?")) {
+          const appRef = doc(db, "applications", id);
+          await updateDoc(appRef, { status: "Approved" });
+      }
+  };
 
-        /* Mobile Adjustments */
-        .main-content { margin-left: 260px; padding: 20px; transition: margin 0.3s ease; }
+  window.deleteApplication = async (id) => { 
+      if(confirm("Delete?")) await deleteDoc(doc(db, "applications", id)); 
+  };
 
-        .mobile-header {
-            display: none; background: white; padding: 15px 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05); position: sticky; top: 0; z-index: 1000;
-        }
+  // 3. Job Posting
+  document.getElementById('jobPostForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+          await addDoc(collection(db, "jobs"), {
+              title: document.getElementById('jobTitle').value,
+              company: document.getElementById('companyName').value,
+              salary: document.getElementById('salary').value,
+              type: document.getElementById('jobType').value,
+              postedAt: serverTimestamp()
+          });
+          alert("Job Posted!"); 
+          document.getElementById('jobPostForm').reset();
+      } catch (err) { console.error(err); }
+  });
 
-        @media (max-width: 992px) {
-            .sidebar { transform: translateX(-100%); }
-            .sidebar.active { transform: translateX(0); }
-            .main-content { margin-left: 0; padding-top: 10px; }
-            .mobile-header { display: flex; justify-content: space-between; align-items: center; }
-            .sidebar-overlay {
-                display: none; position: fixed; top: 0; left: 0; width: 100%;
-                height: 100%; background: rgba(0,0,0,0.5); z-index: 1040;
-            }
-            .sidebar-overlay.show { display: block; }
-        }
+  // 4. Jobs List Load करणे
+  const qJobs = query(collection(db, "jobs"), orderBy("postedAt", "desc"));
+  onSnapshot(qJobs, (snapshot) => {
+      const table = document.getElementById('manageJobsTable');
+      let rows = "";
+      snapshot.forEach(docSnap => {
+          const job = docSnap.data();
+          rows += `<tr><td class="ps-4 fw-bold">${job.title}</td><td>${job.company}</td><td>${job.salary}</td><td class="text-end pe-4"><button onclick="deleteJob('${docSnap.id}')" class="btn btn-light btn-sm text-danger"><i class="bi bi-trash"></i></button></td></tr>`;
+      });
+      table.innerHTML = rows;
+  });
 
-        /* Stats & Cards */
-        .stat-card {
-            background: white; border: none; border-radius: 20px; padding: 25px;
-            transition: all 0.3s ease; box-shadow: 0 10px 30px rgba(0,0,0,0.05); height: 100%;
-        }
+  window.deleteJob = async (id) => { if(confirm("Delete job?")) await deleteDoc(doc(db, "jobs", id)); };
 
-        .custom-table-card { background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+  // 5. Students & Companies Fetching
+  window.fetchUsers = async (role) => {
+      const tableBody = document.getElementById('tableBody');
+      const tableHeader = document.getElementById('tableHeader');
+      tableHeader.innerHTML = `<tr><th class="ps-4">Name</th><th>Email</th><th>Phone</th><th class="text-end pe-4">Action</th></tr>`;
+      
+      const qUsers = query(collection(db, "users"), where("role", "==", role));
+      const querySnapshot = await getDocs(qUsers);
+      tableBody.innerHTML = "";
+      querySnapshot.forEach(docSnap => {
+          const u = docSnap.data();
+          tableBody.innerHTML += `<tr><td class="ps-4 fw-semibold">${u.fullName}</td><td>${u.email}</td><td>${u.phone || 'N/A'}</td><td class="text-end pe-4"><button class="btn btn-light btn-sm text-danger"><i class="bi bi-trash"></i></button></td></tr>`;
+      });
+  };
 
-        .content-section { display: none; }
-        .content-section.active { display: block; }
-        
-        .badge-pending { background: #fff3e0; color: #ef6c00; }
-        .badge-approved { background: #e8f5e9; color: #2e7d32; }
-    </style>
-</head>
-<body>
-
-<div class="mobile-header">
-    <h5 class="fw-bold mb-0 text-primary">BJS Career Portal</h5>
-    <button class="btn btn-primary" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
-</div>
-
-<div class="sidebar-overlay" id="overlay" onclick="toggleSidebar()"></div>
-
-<div class="sidebar" id="sidebar">
-    <div class="sidebar-brand"> BJS Career Portal</div>
-    <nav class="nav flex-column" id="adminSidebar">
-        <a class="nav-link active" onclick="showSection('dashboard', this)"><i class="bi bi-grid-1x2-fill me-2"></i> Dashboard</a>
-        <a class="nav-link" onclick="showSection('addJob', this)"><i class="bi bi-plus-circle-fill me-2"></i> Add Job</a>
-        <a class="nav-link" onclick="showSection('students', this)"><i class="bi bi-people-fill me-2"></i> Students</a>
-        <a class="nav-link" onclick="showSection('companies', this)"><i class="bi bi-building-fill me-2"></i> Companies</a>
-        <a class="nav-link" onclick="showSection('analytics', this)"><i class="bi bi-clipboard-data-fill me-2"></i> Analytics</a>
-        <a class="nav-link" onclick="showSection('settings', this)"><i class="bi bi-gear-fill me-2"></i> Settings</a>
-        <hr class="mx-3 opacity-25">
-        <a class="nav-link text-white bg-danger bg-opacity-25" id="logoutBtn"><i class="bi bi-box-arrow-left me-2"></i> Logout</a>
-    </nav>
-</div>
-
-<div class="main-content">
-    <div class="d-none d-lg-flex justify-content-between align-items-center mb-5">
-        <div>
-            <h2 class="fw-bold mb-0" id="sectionTitle">Dashboard Overview</h2>
-            <p class="text-muted">Welcome back, Admin!</p>
-        </div>
-        <img src="https://ui-avatars.com/api/?name=Admin&background=4e73df&color=fff" class="rounded-circle" width="45">
-    </div>
-
-    <div id="dashboard" class="content-section active">
-        <div class="row g-3 mb-5">
-            <div class="col-6 col-md-3"><div class="stat-card text-center"><h3 id="countStudents">0</h3><p class="text-muted small mb-0">Total Students</p></div></div>
-            <div class="col-6 col-md-3"><div class="stat-card text-center"><h3 id="countCompanies">0</h3><p class="text-muted small mb-0">Partners</p></div></div>
-            <div class="col-6 col-md-3"><div class="stat-card text-center"><h3 class="text-success">85%</h3><p class="text-muted small mb-0">Placement</p></div></div>
-            <div class="col-6 col-md-3"><div class="stat-card text-center"><h3 class="text-primary" id="countApps">0</h3><p class="text-muted small mb-0">Applications</p></div></div>
-        </div>
-
-        <h5 class="fw-bold mb-4">Manage Applications</h5>
-        <div class="custom-table-card">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" style="min-width: 600px;">
-                    <thead class="bg-light">
-                        <tr>
-                            <th class="ps-4">Student</th>
-                            <th>Applied For</th>
-                            <th>Company</th>
-                            <th>Status</th>
-                            <th class="text-end pe-4">Manage</th>
-                        </tr>
-                    </thead>
-                    <tbody id="recentAppsTable">
-                        <tr><td colspan="5" class="text-center p-4 text-muted">Loading...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <div id="addJob" class="content-section">
-        <div class="stat-card col-lg-8 mx-auto">
-            <h5 class="fw-bold mb-4">Post a New Job</h5>
-            <form id="jobPostForm">
-                <div class="row g-3">
-                    <div class="col-md-6"><label class="form-label small fw-bold">Job Title</label><input type="text" id="jobTitle" class="form-control" required></div>
-                    <div class="col-md-6"><label class="form-label small fw-bold">Company</label><input type="text" id="companyName" class="form-control" required></div>
-                    <div class="col-md-6"><label class="form-label small fw-bold">Salary</label><input type="text" id="salary" class="form-control" required></div>
-                    <div class="col-md-6"><label class="form-label small fw-bold">Type</label><select id="jobType" class="form-select"><option>Full Time</option><option>Internship</option></select></div>
-                </div>
-                <button type="submit" class="btn btn-primary mt-4 w-100 w-md-auto px-5">Post Job Now</button>
-            </form>
-        </div>
-        <div class="custom-table-card mt-5">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" style="min-width: 600px;">
-                    <thead><tr><th class="ps-4">Job Title</th><th>Company</th><th>Salary</th><th class="text-end pe-4">Action</th></tr></thead>
-                    <tbody id="manageJobsTable"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <div id="tableSection" class="content-section">
-        <div class="custom-table-card">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0" style="min-width: 600px;">
-                    <thead id="tableHeader"></thead>
-                    <tbody id="tableBody"></tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <div id="analytics" class="content-section"><div class="stat-card"><h5>Analytics Overview</h5></div></div>
-    <div id="settings" class="content-section"><div class="stat-card col-md-6"><h5>Settings</h5></div></div>
-</div>
-
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-
-<script>
- // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyCYt-GaHe9FN3Hk5ULWMNIVeRcOMkcKK-8",
-  authDomain: "hapan-d4d75.firebaseapp.com",
-  databaseURL: "https://hapan-d4d75-default-rtdb.firebaseio.com",
-  projectId: "hapan-d4d75",
-  storageBucket: "hapan-d4d75.firebasestorage.app",
-  messagingSenderId: "558946058796",
-  appId: "1:558946058796:web:2592756709069c5e764789",
-  measurementId: "G-9JRHTYMVPW"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-  // Mobile Toggle Logic
-  function toggleSidebar() {
-      document.getElementById('sidebar').classList.toggle('active');
-      document.getElementById('overlay').classList.toggle('show');
-  }
-
-  function showSection(section, element) {
+  // 6. Sidebar & Section Logic (Module मध्ये असल्यामुळे window ला दिले)
+  window.showSection = (section, element) => {
       document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
       document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
       if(element) element.classList.add('active');
@@ -209,75 +117,25 @@ const analytics = getAnalytics(app);
 
       if (section === 'students' || section === 'companies') {
           document.getElementById('tableSection').classList.add('active');
-          fetchUsers(section === 'students' ? 'Student' : 'Company');
+          window.fetchUsers(section === 'students' ? 'Student' : 'Company');
       } else {
           document.getElementById(section).classList.add('active');
       }
+      if(window.innerWidth < 992) window.toggleSidebar();
+  };
 
-      // Close sidebar on mobile after selection
-      if(window.innerWidth < 992) toggleSidebar();
-  }
+  window.toggleSidebar = () => {
+      document.getElementById('sidebar').classList.toggle('active');
+      document.getElementById('overlay').classList.toggle('show');
+  };
 
-  // Applications Table
-  db.collection("applications").orderBy("appliedAt", "desc").onSnapshot((snapshot) => {
-      const recentTable = document.getElementById('recentAppsTable');
-      document.getElementById('countApps').innerText = snapshot.size;
-      let rows = "";
-      snapshot.forEach((doc) => {
-          const app = doc.data();
-          const statusClass = app.status === 'Approved' ? 'badge-approved' : 'badge-pending';
-          rows += `<tr><td class="ps-4 fw-bold">${app.studentName}</td><td>${app.jobTitle}</td><td>${app.companyName}</td><td><span class="badge ${statusClass} rounded-pill px-3">${app.status || 'Pending'}</span></td><td class="text-end pe-4"><button onclick="approveApplication('${doc.id}')" class="btn btn-sm btn-light text-success me-1"><i class="bi bi-check"></i></button><button onclick="deleteApplication('${doc.id}')" class="btn btn-sm btn-light text-danger"><i class="bi bi-trash"></i></button></td></tr>`;
-      });
-      recentTable.innerHTML = snapshot.empty ? "<tr><td colspan='5' class='text-center p-4'>No Data</td></tr>" : rows;
+  // 7. Logout
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+      signOut(auth).then(() => window.location.href = "login.html");
   });
 
-  window.approveApplication = (id) => { if(confirm("Approve?")) db.collection("applications").doc(id).update({ status: "Approved" }); };
-  window.deleteApplication = (id) => { if(confirm("Delete?")) db.collection("applications").doc(id).delete(); };
+  // 8. Real-time Counts
+  onSnapshot(query(collection(db, "users"), where("role", "==", "Student")), snap => document.getElementById('countStudents').innerText = snap.size);
+  onSnapshot(query(collection(db, "users"), where("role", "==", "Company")), snap => document.getElementById('countCompanies').innerText = snap.size);
 
-  // Job Posting
-  document.getElementById('jobPostForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      db.collection("jobs").add({
-          title: document.getElementById('jobTitle').value,
-          company: document.getElementById('companyName').value,
-          salary: document.getElementById('salary').value,
-          type: document.getElementById('jobType').value,
-          postedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }).then(() => { alert("Job Posted!"); document.getElementById('jobPostForm').reset(); });
-  });
-
-  db.collection("jobs").orderBy("postedAt", "desc").onSnapshot(snapshot => {
-      const table = document.getElementById('manageJobsTable');
-      let rows = "";
-      snapshot.forEach(doc => {
-          const job = doc.data();
-          rows += `<tr><td class="ps-4 fw-bold">${job.title}</td><td>${job.company}</td><td>${job.salary}</td><td class="text-end pe-4"><button onclick="deleteJob('${doc.id}')" class="btn btn-light btn-sm text-danger"><i class="bi bi-trash"></i></button></td></tr>`;
-      });
-      table.innerHTML = rows;
-  });
-
-  window.deleteJob = (id) => { if(confirm("Delete job?")) db.collection("jobs").doc(id).delete(); };
-
-  function fetchUsers(role) {
-      const tableBody = document.getElementById('tableBody');
-      const tableHeader = document.getElementById('tableHeader');
-      tableHeader.innerHTML = `<tr><th class="ps-4">Name</th><th>Email</th><th>Phone</th><th class="text-end pe-4">Action</th></tr>`;
-      db.collection("users").where("role", "==", role).get().then((snap) => {
-          tableBody.innerHTML = "";
-          snap.forEach(doc => {
-              const u = doc.data();
-              tableBody.innerHTML += `<tr><td class="ps-4 fw-semibold">${u.fullName}</td><td>${u.email}</td><td>${u.phone || 'N/A'}</td><td class="text-end pe-4"><button class="btn btn-light btn-sm text-danger"><i class="bi bi-trash"></i></button></td></tr>`;
-          });
-      });
-  }
-
-  document.getElementById('logoutBtn').addEventListener('click', (e) => {
-      e.preventDefault();
-      auth.signOut().then(() => window.location.href = "login.html");
-  });
-
-  db.collection("users").where("role", "==", "Student").onSnapshot(snap => document.getElementById('countStudents').innerText = snap.size);
-  db.collection("users").where("role", "==", "Company").onSnapshot(snap => document.getElementById('countCompanies').innerText = snap.size);
 </script>
-</body>
-</html>
